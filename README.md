@@ -1,1 +1,0 @@
-# 3dumac.github.io
