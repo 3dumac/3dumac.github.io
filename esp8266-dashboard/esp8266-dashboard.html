@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP8266 NodeMCU — Pin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --panel: #0d1117;
+    --border: #1c2a3a;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff14;
+    --accent4: #bf5af2;
+    --accent5: #ffd60a;
+    --text: #c9d1d9;
+    --muted: #4a5568;
+    --glow: 0 0 12px rgba(0,229,255,0.4);
+    --glow2: 0 0 12px rgba(255,107,53,0.4);
+    --glow3: 0 0 12px rgba(57,255,20,0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 20px; }
+
+  .chip-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #1a2a3a, #0d1e2e);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--glow), inset 0 0 20px rgba(0,229,255,0.05);
+    font-size: 24px;
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(18px, 3vw, 28px);
+    font-weight: 900;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    letter-spacing: 2px;
+    line-height: 1.1;
+  }
+  h1 span { color: var(--accent2); text-shadow: var(--glow2); }
+
+  .subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  .status-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; color: var(--accent3);
+    letter-spacing: 2px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: var(--glow3);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 28px; align-items: center;
+  }
+
+  .search-box {
+    flex: 1; min-width: 200px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 16px 10px 40px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap::before {
+    content: '⌕';
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 16px; z-index: 1;
+    pointer-events: none;
+  }
+  .search-box:focus { border-color: var(--accent); box-shadow: var(--glow); }
+  .search-box::placeholder { color: var(--muted); }
+
+  .filter-btn {
+    padding: 10px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.08);
+    box-shadow: var(--glow);
+  }
+  .filter-btn[data-cap="PWM"].active { border-color: var(--accent2); color: var(--accent2); background: rgba(255,107,53,0.08); box-shadow: var(--glow2); }
+  .filter-btn[data-cap="I2C"].active { border-color: var(--accent4); color: var(--accent4); background: rgba(191,90,242,0.08); box-shadow: 0 0 12px rgba(191,90,242,0.4); }
+  .filter-btn[data-cap="SPI"].active { border-color: var(--accent3); color: var(--accent3); background: rgba(57,255,20,0.08); box-shadow: var(--glow3); }
+  .filter-btn[data-cap="UART"].active { border-color: var(--accent5); color: var(--accent5); background: rgba(255,214,10,0.08); box-shadow: 0 0 12px rgba(255,214,10,0.4); }
+  .filter-btn[data-cap="BOOT"].active { border-color: #ff3355; color: #ff3355; background: rgba(255,51,85,0.08); box-shadow: 0 0 12px rgba(255,51,85,0.4); }
+  .filter-btn[data-cap="ADC"].active { border-color: #00bfff; color: #00bfff; background: rgba(0,191,255,0.08); }
+
+  /* Main grid layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* Panels */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(0,0,0,0.3);
+  }
+  .panel-header h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .panel-header .icon { font-size: 14px; }
+
+  /* Pinout diagram */
+  .pinout-wrap {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .nodemcu-board {
+    position: relative;
+    width: 280px;
+  }
+
+  .board-body {
+    background: linear-gradient(160deg, #1a3a2a 0%, #0f2218 100%);
+    border: 2px solid #2a5a3a;
+    border-radius: 12px;
+    padding: 16px 0;
+    position: relative;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(57,255,20,0.1);
+  }
+
+  .board-label {
+    text-align: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: rgba(57,255,20,0.4);
+    padding: 4px 0 8px;
+    border-bottom: 1px solid rgba(57,255,20,0.1);
+    margin-bottom: 8px;
+  }
+
+  .board-chip {
+    margin: 10px auto;
+    width: 80px; height: 56px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid #2a3a5a;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: rgba(0,229,255,0.5);
+    letter-spacing: 1px;
+    text-align: center;
+    line-height: 1.4;
+    box-shadow: 0 0 20px rgba(0,229,255,0.1);
+  }
+
+  .pins-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 8px;
+  }
+
+  .pin-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .pin-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .pin-item:hover { background: rgba(0,229,255,0.07); }
+  .pin-item.active { background: rgba(0,229,255,0.12); }
+  .pin-item.hidden { opacity: 0.15; pointer-events: none; }
+
+  .pin-item.left { flex-direction: row-reverse; }
+
+  .pin-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid;
+    flex-shrink: 0;
+    transition: box-shadow 0.2s;
+  }
+  .pin-item:hover .pin-dot, .pin-item.active .pin-dot {
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .pin-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Pin colors by type */
+  .type-power .pin-dot { border-color: #ff4444; color: #ff4444; background: rgba(255,68,68,0.2); }
+  .type-power .pin-label { color: #ff6666; }
+  .type-gnd .pin-dot { border-color: #666; color: #666; background: rgba(102,102,102,0.2); }
+  .type-gnd .pin-label { color: #888; }
+  .type-gpio .pin-dot { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.1); }
+  .type-gpio .pin-label { color: var(--accent); }
+  .type-adc .pin-dot { border-color: #00bfff; color: #00bfff; background: rgba(0,191,255,0.1); }
+  .type-adc .pin-label { color: #00bfff; }
+  .type-special .pin-dot { border-color: var(--accent5); color: var(--accent5); background: rgba(255,214,10,0.1); }
+  .type-special .pin-label { color: var(--accent5); }
+
+  /* Right panel tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 12px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Pin table */
+  .pin-table-wrap { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+  .pin-table {
+    width: 100%; border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+  .pin-table thead {
+    position: sticky; top: 0;
+    background: #0a0f14;
+    z-index: 2;
+  }
+  .pin-table th {
+    padding: 12px 16px;
+    text-align: left;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pin-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(28,42,58,0.5);
+    transition: background 0.15s;
+  }
+  .pin-table tr:hover td { background: rgba(0,229,255,0.04); }
+  .pin-table tr.hidden-row { display: none; }
+
+  .pin-name { color: var(--accent); font-weight: bold; }
+  .gpio-name { color: #7de8ff; }
+  .arduino-name { color: var(--accent5); }
+
+  .cap-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin: 1px;
+    border: 1px solid;
+  }
+  .cap-PWM  { color: var(--accent2); border-color: rgba(255,107,53,0.4); background: rgba(255,107,53,0.07); }
+  .cap-I2C  { color: var(--accent4); border-color: rgba(191,90,242,0.4); background: rgba(191,90,242,0.07); }
+  .cap-SPI  { color: var(--accent3); border-color: rgba(57,255,20,0.4);  background: rgba(57,255,20,0.07); }
+  .cap-UART { color: var(--accent5); border-color: rgba(255,214,10,0.4); background: rgba(255,214,10,0.07); }
+  .cap-ADC  { color: #00bfff;        border-color: rgba(0,191,255,0.4);  background: rgba(0,191,255,0.07); }
+  .cap-BOOT { color: #ff3355;        border-color: rgba(255,51,85,0.4);  background: rgba(255,51,85,0.07); }
+  .cap-INT  { color: #c084fc;        border-color: rgba(192,132,252,0.4);background: rgba(192,132,252,0.07); }
+  .cap-GND  { color: #888;           border-color: rgba(136,136,136,0.4);background: rgba(136,136,136,0.07); }
+  .cap-3V3  { color: #ff6666;        border-color: rgba(255,68,68,0.4);  background: rgba(255,68,68,0.07); }
+  .cap-VIN  { color: #ff8800;        border-color: rgba(255,136,0,0.4);  background: rgba(255,136,0,0.07); }
+
+  /* Function guide */
+  .func-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .func-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .func-card:hover { border-color: var(--accent); box-shadow: var(--glow); }
+
+  .func-card-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  .func-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .func-title { font-size: 13px; color: var(--text); font-weight: 600; }
+  .func-desc { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .func-pins-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .func-pin-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  /* Boot warnings */
+  .boot-section { padding: 20px; }
+  .boot-card {
+    border: 1px solid rgba(255,51,85,0.3);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    background: rgba(255,51,85,0.03);
+  }
+  .boot-card-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255,51,85,0.08);
+    border-bottom: 1px solid rgba(255,51,85,0.2);
+  }
+  .boot-pin-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ff3355;
+    text-shadow: 0 0 8px rgba(255,51,85,0.5);
+  }
+  .boot-state {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-left: auto;
+  }
+  .boot-state.high { background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.4); color: var(--accent3); }
+  .boot-state.low  { background: rgba(255,51,85,0.1); border: 1px solid rgba(255,51,85,0.4);  color: #ff3355; }
+  .boot-state.float{ background: rgba(255,214,10,0.1); border: 1px solid rgba(255,214,10,0.4); color: var(--accent5); }
+
+  .boot-card-body { padding: 14px 16px; }
+  .boot-card-body p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+  .boot-warn {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255,214,10,0.05);
+    border: 1px solid rgba(255,214,10,0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #c8a800;
+    line-height: 1.5;
+    margin-top: 8px;
+  }
+  .boot-warn::before { content: '⚠'; flex-shrink: 0; margin-top: 1px; }
+
+  .gen-warnings {
+    background: rgba(255,107,53,0.05);
+    border: 1px solid rgba(255,107,53,0.2);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 8px;
+  }
+  .gen-warnings h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    margin-bottom: 12px;
+  }
+  .gen-warnings ul { padding-left: 4px; list-style: none; }
+  .gen-warnings li {
+    font-size: 12px; color: var(--muted);
+    padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding-left: 16px; position: relative; line-height: 1.5;
+  }
+  .gen-warnings li::before { content: '▸'; position: absolute; left: 0; color: var(--accent2); }
+
+  /* Detail panel */
+  .pin-detail {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    width: 280px;
+    background: #0a1018;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: var(--glow), 0 8px 32px rgba(0,0,0,0.6);
+    z-index: 100;
+    transform: translateY(120%);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .pin-detail.show { transform: translateY(0); }
+  .pin-detail-close {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: none; color: var(--muted);
+    font-size: 16px; cursor: pointer; transition: color 0.2s;
+  }
+  .pin-detail-close:hover { color: var(--accent); }
+  .pin-detail h3 { font-family: 'Orbitron', monospace; font-size: 14px; color: var(--accent); margin-bottom: 4px; }
+  .pin-detail .gpio { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .pin-detail .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .pin-detail .detail-label { color: var(--muted); }
+  .pin-detail .detail-val { color: var(--text); }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 12px 20px;
+    background: rgba(0,0,0,0.2);
+    border-top: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .count-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.2);
+    color: var(--accent);
+    margin-left: auto;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-left">
+      <div class="chip-icon">🔌</div>
+      <div>
+        <h1>ESP8266 <span>NodeMCU</span> 1.0</h1>
+        <div class="subtitle">Pin Reference Dashboard · v3.0 · 80/160 MHz · 3.3V Logic</div>
+      </div>
+    </div>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      SISTEMA ACTIVO
+    </div>
+  </header>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <input class="search-box" type="text" id="searchInput" placeholder="Buscar pin, GPIO, función...">
+    </div>
+    <button class="filter-btn active" data-cap="ALL">TODOS</button>
+    <button class="filter-btn" data-cap="PWM">PWM</button>
+    <button class="filter-btn" data-cap="I2C">I2C</button>
+    <button class="filter-btn" data-cap="SPI">SPI</button>
+    <button class="filter-btn" data-cap="UART">UART</button>
+    <button class="filter-btn" data-cap="ADC">ADC</button>
+    <button class="filter-btn" data-cap="BOOT">⚠ BOOT</button>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left: Pinout diagram -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="icon">🗺</span>
+          <h2>Diagrama de Pines</h2>
+        </div>
+        <div class="pinout-wrap">
+          <div class="nodemcu-board">
+            <div class="board-body">
+              <div class="board-label">ESP8266 NodeMCU v1.0</div>
+              <!-- Left side pins top to bottom -->
+              <div class="pins-row">
+                <div class="pin-col" id="leftPins"></div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0">
+                  <div class="board-chip">ESP-12E<br>MODULE</div>
+                  <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(57,255,20,0.3);text-align:center;letter-spacing:1px;">CH340G<br>USB-UART</div>
+                </div>
+                <div class="pin-col" id="rightPins"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="border-color:#ff4444;background:rgba(255,68,68,0.2)"></div>Power</div>
+          <div class="legend-item"><div class="legend-dot" style="border-color:#666;background:rgba(102,102,102,0.2)"></div>GND</div>
+          <div class="legend-item"><div class="legend-dot" style="border-color:var(--accent);background:rgba(0,229,255,0.1)"></div>GPIO</div>
+          <div class="legend-item"><div class="legend-dot" style="border-color:#00bfff;background:rgba(0,191,255,0.1)"></div>ADC</div>
+          <div class="legend-item"><div class="legend-dot" style="border-color:var(--accent5);background:rgba(255,214,10,0.1)"></div>Special</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Tabs panel -->
+    <div>
+      <div class="panel" style="height:100%">
+        <div class="tabs">
+          <div class="tab active" data-tab="mapping">MAPEO DE PINES</div>
+          <div class="tab" data-tab="functions">FUNCIONES</div>
+          <div class="tab" data-tab="boot">⚠ BOOT</div>
+        </div>
+
+        <!-- Tab: Mapping table -->
+        <div class="tab-content active" id="tab-mapping">
+          <div class="pin-table-wrap">
+            <table class="pin-table">
+              <thead>
+                <tr>
+                  <th>PIN BOARD</th>
+                  <th>GPIO</th>
+                  <th>ARDUINO IDE</th>
+                  <th>FUNCIÓN PRINCIPAL</th>
+                  <th>CAPACIDADES</th>
+                </tr>
+              </thead>
+              <tbody id="pinTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab: Functions -->
+        <div class="tab-content" id="tab-functions">
+          <div class="func-grid" id="funcGrid"></div>
+        </div>
+
+        <!-- Tab: Boot -->
+        <div class="tab-content" id="tab-boot">
+          <div class="boot-section" id="bootSection"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pin detail tooltip -->
+<div class="pin-detail" id="pinDetail">
+  <button class="pin-detail-close" id="detailClose">✕</button>
+  <h3 id="dName">D1</h3>
+  <div class="gpio" id="dGpio">GPIO5</div>
+  <div class="detail-row"><span class="detail-label">Arduino IDE</span><span class="detail-val" id="dArduino">—</span></div>
+  <div class="detail-row"><span class="detail-label">Voltaje</span><span class="detail-val">3.3V lógica</span></div>
+  <div class="detail-row"><span class="detail-label">Corriente máx.</span><span class="detail-val" id="dCurrent">12 mA</span></div>
+  <div class="detail-row"><span class="detail-label">Funciones</span><span class="detail-val" id="dCaps">—</span></div>
+  <div class="detail-row"><span class="detail-label">Notas</span><span class="detail-val" id="dNotes" style="font-size:10px;text-align:right;max-width:140px">—</span></div>
+</div>
+
+<script>
+// ─── Pin data ─────────────────────────────────────────────────────────────────
+const pins = [
+  // name, gpio, arduino, type, func, caps[], notes, current
+  { name:'A0',    gpio:'ADC0',  arduino:'A0', type:'adc',     func:'Entrada Analógica',    caps:['ADC'],                   notes:'0–1V, 10-bit ADC',       current:'N/A', side:'left'  },
+  { name:'RST',   gpio:'RST',   arduino:'—',  type:'special', func:'Reset',                caps:[],                        notes:'Pull-up interno',        current:'—',   side:'left'  },
+  { name:'3V3',   gpio:'—',     arduino:'—',  type:'power',   func:'3.3V Salida',          caps:['3V3'],                   notes:'Máx. 500mA',             current:'—',   side:'left'  },
+  { name:'GND',   gpio:'GND',   arduino:'—',  type:'gnd',     func:'Tierra',               caps:['GND'],                   notes:'',                       current:'—',   side:'left'  },
+  { name:'D5',    gpio:'GPIO14',arduino:'14', type:'gpio',    func:'SPI CLK / GPIO',       caps:['SPI','PWM','INT'],        notes:'SPI_CLK (HSCLK)',        current:'12mA',side:'left'  },
+  { name:'D6',    gpio:'GPIO12',arduino:'12', type:'gpio',    func:'SPI MISO / GPIO',      caps:['SPI','PWM','INT'],        notes:'SPI_MISO (HMISO)',       current:'12mA',side:'left'  },
+  { name:'D7',    gpio:'GPIO13',arduino:'13', type:'gpio',    func:'SPI MOSI / UART2 RX',  caps:['SPI','UART','PWM','INT'],notes:'SPI_MOSI (HMOSI)',       current:'12mA',side:'left'  },
+  { name:'D8',    gpio:'GPIO15',arduino:'15', type:'gpio',    func:'SPI CS / UART2 TX',    caps:['SPI','UART','PWM','BOOT'],notes:'BOOT: LOW requerido',   current:'12mA',side:'left'  },
+  { name:'3V3',   gpio:'—',     arduino:'—',  type:'power',   func:'3.3V Salida',          caps:['3V3'],                   notes:'Máx. 500mA',             current:'—',   side:'left'  },
+  { name:'GND',   gpio:'GND',   arduino:'—',  type:'gnd',     func:'Tierra',               caps:['GND'],                   notes:'',                       current:'—',   side:'left'  },
+  { name:'D0',    gpio:'GPIO16',arduino:'16', type:'gpio',    func:'Wake / GPIO',          caps:['INT'],                   notes:'Sin PWM, Deep-Sleep Wake',current:'12mA',side:'right' },
+  { name:'D1',    gpio:'GPIO5', arduino:'5',  type:'gpio',    func:'I2C SCL / GPIO',       caps:['I2C','PWM','INT'],        notes:'I2C_SCL por defecto',    current:'12mA',side:'right' },
+  { name:'D2',    gpio:'GPIO4', arduino:'4',  type:'gpio',    func:'I2C SDA / GPIO',       caps:['I2C','PWM','INT'],        notes:'I2C_SDA por defecto',    current:'12mA',side:'right' },
+  { name:'D3',    gpio:'GPIO0', arduino:'0',  type:'gpio',    func:'Flash / BOOT',         caps:['PWM','INT','BOOT'],       notes:'BOOT: HIGH requerido',   current:'12mA',side:'right' },
+  { name:'D4',    gpio:'GPIO2', arduino:'2',  type:'gpio',    func:'UART1 TX / LED',       caps:['UART','PWM','INT','BOOT'],notes:'BOOT: HIGH. LED built-in',current:'12mA',side:'right'},
+  { name:'GND',   gpio:'GND',   arduino:'—',  type:'gnd',     func:'Tierra',               caps:['GND'],                   notes:'',                       current:'—',   side:'right' },
+  { name:'5V',    gpio:'—',     arduino:'—',  type:'power',   func:'5V USB (VIN)',         caps:['VIN'],                   notes:'Entrada desde USB',      current:'—',   side:'right' },
+  { name:'VIN',   gpio:'—',     arduino:'—',  type:'power',   func:'Voltaje de Entrada',   caps:['VIN'],                   notes:'4.5–9V externo',         current:'—',   side:'right' },
+  { name:'TX',    gpio:'GPIO1', arduino:'1',  type:'gpio',    func:'UART0 TX',             caps:['UART','BOOT'],            notes:'UART debug al arranque', current:'12mA',side:'right' },
+  { name:'RX',    gpio:'GPIO3', arduino:'3',  type:'gpio',    func:'UART0 RX',             caps:['UART','PWM'],             notes:'UART0 recepción',        current:'12mA',side:'right' },
+];
+
+// Filter only GPIOs for diagram (remove duplicates/power for visual)
+const leftPinsDef = pins.filter(p => p.side === 'left');
+const rightPinsDef = pins.filter(p => p.side === 'right');
+
+// Functions data
+const functions = [
+  {
+    name:'I2C', color:'#bf5af2', bg:'rgba(191,90,242,0.08)',
+    title:'Inter-Integrated Circuit',
+    desc:'Bus de comunicación serial de 2 hilos para conectar múltiples sensores y periféricos a corta distancia. Velocidad: 100kHz / 400kHz.',
+    pins:['D1 (GPIO5) SCL','D2 (GPIO4) SDA'],
+    extra:'Pull-ups de 4.7kΩ recomendados en ambas líneas.'
+  },
+  {
+    name:'SPI', color:'#39ff14', bg:'rgba(57,255,20,0.08)',
+    title:'Serial Peripheral Interface',
+    desc:'Bus síncrono de 4 hilos, alta velocidad hasta 80 MHz. Ideal para pantallas, tarjetas SD y memorias flash.',
+    pins:['D5 (GPIO14) CLK','D6 (GPIO12) MISO','D7 (GPIO13) MOSI','D8 (GPIO15) CS'],
+    extra:'CS puede ser cualquier GPIO. MOSI/MISO requieren nivel 3.3V.'
+  },
+  {
+    name:'PWM', color:'#ff6b35', bg:'rgba(255,107,53,0.08)',
+    title:'Pulse Width Modulation',
+    desc:'Modulación por ancho de pulso por software en casi todos los GPIOs. Frecuencia: 1kHz–1MHz. Resolución: 10 bits (0–1023).',
+    pins:['D1 (GPIO5)','D2 (GPIO4)','D3 (GPIO0)','D4 (GPIO2)','D5 (GPIO14)','D6 (GPIO12)','D7 (GPIO13)','D8 (GPIO15)','RX (GPIO3)'],
+    extra:'GPIO16 (D0) NO soporta PWM. Usa analogWrite() en Arduino IDE.'
+  },
+  {
+    name:'UART', color:'#ffd60a', bg:'rgba(255,214,10,0.08)',
+    title:'Universal Async Receiver-Transmitter',
+    desc:'Dos interfaces UART disponibles. UART0 para debug/programación, UART1 solo TX para logs adicionales.',
+    pins:['TX (GPIO1) UART0-TX','RX (GPIO3) UART0-RX','D4 (GPIO2) UART1-TX','D7 (GPIO13) UART2-RX','D8 (GPIO15) UART2-TX'],
+    extra:'UART0 emite datos de debug al arrancar. Usar Serial.setDebugOutput(false) para suprimirlo.'
+  },
+  {
+    name:'ADC', color:'#00bfff', bg:'rgba(0,191,255,0.08)',
+    title:'Analog-to-Digital Converter',
+    desc:'Un único canal ADC de 10 bits (0–1023). Rango de entrada: 0–1V. Usar divisor resistivo para señales de mayor voltaje.',
+    pins:['A0 (ADC0) — Único canal'],
+    extra:'No usar A0 y WiFi simultáneamente bajo carga intensiva; puede causar lecturas inestables.'
+  },
+  {
+    name:'INT', color:'#c084fc', bg:'rgba(192,132,252,0.08)',
+    title:'Interrupciones Externas',
+    desc:'Casi todos los GPIOs soportan interrupciones. Modos: RISING, FALLING, CHANGE, LOW, HIGH. Usar attachInterrupt().',
+    pins:['D0 (GPIO16) solo HIGH/LOW','D1–D8 (GPIO4–15) todos los modos','TX/RX (GPIO1/3) limitados'],
+    extra:'GPIO16 solo soporta modos HIGH/LOW, no RISING ni FALLING.'
+  },
+];
+
+// Boot pins data
+const bootPins = [
+  {
+    name:'D3 / GPIO0', requiredState:'HIGH', stateClass:'high',
+    desc:'Pin de modo de arranque. Define si el ESP8266 inicia en modo Flash (programación) o modo Normal (ejecución).',
+    detail: [
+      { label:'HIGH al arrancar', val:'Modo Normal — ejecuta el firmware' },
+      { label:'LOW al arrancar', val:'Modo Flash — espera reprogramación por UART' },
+    ],
+    warns:[
+      'Nunca conectar directamente a GND sin lógica de control.',
+      'Botón FLASH en la placa mantiene este pin LOW temporalmente.',
+      'Evitar cargas capacitivas que retrasen el flanco de subida al encender.',
+      'Puede usarse como GPIO de salida en funcionamiento normal.',
+    ]
+  },
+  {
+    name:'D4 / GPIO2', requiredState:'HIGH', stateClass:'high',
+    desc:'Debe estar HIGH al arrancar. Conectado al LED integrado (activo bajo). También es UART1-TX.',
+    detail: [
+      { label:'HIGH al arrancar', val:'Arranque normal' },
+      { label:'LOW al arrancar', val:'Fallo de arranque / bucle de reset' },
+    ],
+    warns:[
+      'El LED integrado está conectado a este pin (activo bajo): encendido = GPIO2 LOW.',
+      'No conectar resistencias de pull-down externas.',
+      'Al inicio emite datos UART1 (debug). Desactivar con Serial1.begin() si es necesario.',
+      'Seguro para uso como GPIO de salida/entrada después del arranque.',
+    ]
+  },
+  {
+    name:'D8 / GPIO15', requiredState:'LOW', stateClass:'low',
+    desc:'Debe estar LOW al arrancar. Tiene pull-down interno. Si se conecta HIGH, el dispositivo no arranca.',
+    detail: [
+      { label:'LOW al arrancar', val:'Arranque normal desde Flash' },
+      { label:'HIGH al arrancar', val:'Arranque desde SD Card (modo especial)' },
+    ],
+    warns:[
+      'Siempre debe tener pull-down (10kΩ) si se conecta a periféricos.',
+      'Es el CS del bus SPI hardware — asegurar estado LOW durante boot.',
+      'No dejar el pin flotante: puede atrapar nivel HIGH y bloquear el arranque.',
+      'Resistencia pull-down interna está disponible pero es débil (weak pull-down).',
+    ]
+  },
+];
+
+// ─── Render pinout diagram ────────────────────────────────────────────────────
+function buildDiagram() {
+  const leftEl = document.getElementById('leftPins');
+  const rightEl = document.getElementById('rightPins');
+
+  leftPinsDef.forEach(p => {
+    const el = buildPinEl(p, 'left');
+    leftEl.appendChild(el);
+  });
+
+  rightPinsDef.forEach(p => {
+    const el = buildPinEl(p, 'right');
+    rightEl.appendChild(el);
+  });
+}
+
+function buildPinEl(p, side) {
+  const el = document.createElement('div');
+  el.className = `pin-item type-${p.type} ${side === 'left' ? 'left' : ''}`;
+  el.dataset.gpio = p.gpio;
+  el.dataset.name = p.name;
+  const dot = document.createElement('div');
+  dot.className = 'pin-dot';
+  const lbl = document.createElement('div');
+  lbl.className = 'pin-label';
+  lbl.textContent = p.name;
+  el.appendChild(dot);
+  el.appendChild(lbl);
+  el.addEventListener('click', () => showDetail(p));
+  return el;
+}
+
+// ─── Render pin table ─────────────────────────────────────────────────────────
+function buildTable() {
+  const tbody = document.getElementById('pinTableBody');
+  pins.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.dataset.caps = p.caps.join(' ');
+    tr.dataset.name = (p.name + ' ' + p.gpio + ' ' + p.func + ' ' + p.caps.join(' ')).toLowerCase();
+    tr.innerHTML = `
+      <td class="pin-name">${p.name}</td>
+      <td class="gpio-name">${p.gpio}</td>
+      <td class="arduino-name">${p.arduino}</td>
+      <td style="color:var(--text);font-size:11px">${p.func}</td>
+      <td>${p.caps.map(c => `<span class="cap-badge cap-${c}">${c}</span>`).join('')}</td>
+    `;
+    tr.addEventListener('click', () => showDetail(p));
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── Render functions ─────────────────────────────────────────────────────────
+function buildFunctions() {
+  const grid = document.getElementById('funcGrid');
+  functions.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'func-card';
+    card.innerHTML = `
+      <div class="func-card-header">
+        <span class="func-badge" style="color:${f.color};border:1px solid ${f.color};background:${f.bg}">${f.name}</span>
+        <span class="func-title">${f.title}</span>
+      </div>
+      <p class="func-desc">${f.desc}</p>
+      <div class="func-pins-list">${f.pins.map(p => `<span class="func-pin-tag">${p}</span>`).join('')}</div>
+      <div style="margin-top:10px;font-size:11px;color:#555;font-style:italic;line-height:1.5">${f.extra}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ─── Render boot section ──────────────────────────────────────────────────────
+function buildBoot() {
+  const sec = document.getElementById('bootSection');
+  bootPins.forEach(bp => {
+    const card = document.createElement('div');
+    card.className = 'boot-card';
+    card.innerHTML = `
+      <div class="boot-card-header">
+        <span style="font-size:16px">⚡</span>
+        <span class="boot-pin-name">${bp.name}</span>
+        <span class="boot-state ${bp.stateClass}">BOOT: ${bp.requiredState}</span>
+      </div>
+      <div class="boot-card-body">
+        <p>${bp.desc}</p>
+        ${bp.detail.map(d => `<div class="detail-row" style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:11px;font-family:'Share Tech Mono',monospace"><span style="color:var(--muted)">${d.label}</span><span style="color:var(--text)">${d.val}</span></div>`).join('')}
+        ${bp.warns.map(w => `<div class="boot-warn">${w}</div>`).join('')}
+      </div>
+    `;
+    sec.appendChild(card);
+  });
+
+  // General warnings
+  const gen = document.createElement('div');
+  gen.className = 'gen-warnings';
+  gen.innerHTML = `
+    <h3>PRECAUCIONES GENERALES DE VOLTAJE</h3>
+    <ul>
+      <li>Todos los GPIO operan a 3.3V lógico — NO conectar señales de 5V directamente</li>
+      <li>Corriente máxima por pin GPIO: 12 mA; total recomendado por chip: 200 mA</li>
+      <li>GPIO16 (D0) tiene funcionalidades reducidas: sin PWM, sin interrupciones CHANGE</li>
+      <li>El ADC (A0) tiene rango de entrada 0–1V; usar divisor de tensión para 3.3V</li>
+      <li>Pins TX/RX activos durante programación: desconectar hardware externo al flashear</li>
+      <li>GPIO6–GPIO11 están reservados para la Flash SPI interna: NO usar</li>
+      <li>Deep Sleep: conectar RST a GPIO16 (D0) para despertar automáticamente</li>
+    </ul>
+  `;
+  sec.appendChild(gen);
+}
+
+// ─── Detail popup ─────────────────────────────────────────────────────────────
+function showDetail(p) {
+  document.getElementById('dName').textContent = p.name;
+  document.getElementById('dGpio').textContent = p.gpio;
+  document.getElementById('dArduino').textContent = p.arduino;
+  document.getElementById('dCurrent').textContent = p.current;
+  document.getElementById('dCaps').textContent = p.caps.join(', ') || '—';
+  document.getElementById('dNotes').textContent = p.notes || '—';
+  document.getElementById('pinDetail').classList.add('show');
+
+  // Highlight on diagram
+  document.querySelectorAll('.pin-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.name === p.name && el.dataset.gpio === p.gpio);
+  });
+}
+
+document.getElementById('detailClose').addEventListener('click', () => {
+  document.getElementById('pinDetail').classList.remove('show');
+  document.querySelectorAll('.pin-item').forEach(el => el.classList.remove('active'));
+});
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+let activeFilter = 'ALL';
+
+function applyFilter(cap, search) {
+  const rows = document.querySelectorAll('#pinTableBody tr');
+  let count = 0;
+  rows.forEach(tr => {
+    const matchCap = cap === 'ALL' || tr.dataset.caps.includes(cap);
+    const matchSearch = !search || tr.dataset.name.includes(search.toLowerCase());
+    const show = matchCap && matchSearch;
+    tr.classList.toggle('hidden-row', !show);
+    if (show) count++;
+  });
+
+  // Filter diagram pins
+  document.querySelectorAll('.pin-item').forEach(el => {
+    const pin = pins.find(p => p.name === el.dataset.name && p.gpio === el.dataset.gpio);
+    if (!pin) return;
+    const matchCap = cap === 'ALL' || pin.caps.includes(cap);
+    const matchSearch = !search || (pin.name + pin.gpio + pin.func + pin.caps.join(' ')).toLowerCase().includes(search.toLowerCase());
+    el.classList.toggle('hidden', !(matchCap && matchSearch));
+  });
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.cap;
+    applyFilter(activeFilter, document.getElementById('searchInput').value);
+    // Switch to mapping tab if not there
+    if (activeFilter !== 'ALL') {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector('[data-tab="mapping"]').classList.add('active');
+      document.getElementById('tab-mapping').classList.add('active');
+    }
+  });
+});
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  applyFilter(activeFilter, e.target.value);
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildDiagram();
+buildTable();
+buildFunctions();
+buildBoot();
+</script>
+</body>
+</html>
